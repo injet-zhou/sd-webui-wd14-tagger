@@ -1,3 +1,4 @@
+import json
 import os
 import gc
 import pandas as pd
@@ -232,10 +233,51 @@ class WaifuDiffusionInterrogator(Interrogator):
             **self.kwargs, filename=self.model_path))
         tags_path = Path(hf_hub_download(
             **self.kwargs, filename=self.tags_path))
+        self.save_model_config(model_path, tags_path)
         return model_path, tags_path
 
+    def save_model_config(self, model_path: os.PathLike, tags_path: os.PathLike) -> None:
+        models_path = Path(shared.models_path, "interrogator")
+        model_config_filename = "model.json"
+        model_config_path = Path(models_path, model_config_filename)
+        if not os.path.exists(models_path):
+            os.makedirs(models_path)
+
+        if not os.path.exists(model_config_path):
+            with open(model_config_path, "w") as f:
+                json.dump({}, f)
+
+        model_config = {
+            "name": self.name,
+            "model_path": str(model_path),
+            "tags_path": str(tags_path),
+        }
+        # append or update model config
+        with open(model_config_path, "r") as f:
+            model_configs = json.load(f)
+            model_configs[self.name] = model_config
+        with open(model_config_path, "w") as f:
+            json.dump(model_configs, f)
+        print(f"Saved {self.name} model config to {model_config_path}")
+
+    def load_model_config(self) -> Tuple[os.PathLike, os.PathLike]:
+        # if model config exists, load model from config
+        models_path = Path(shared.models_path, "interrogator")
+        model_config_filename = "model.json"
+        model_config_path = Path(models_path, model_config_filename)
+        if os.path.exists(model_config_path):
+            with open(model_config_path, "r") as f:
+                model_configs = json.load(f)
+                if model_configs[self.name]:
+                    model_config = model_configs[self.name]
+                    model_path = Path(model_config["model_path"])
+                    tags_path = Path(model_config["tags_path"])
+                    return model_path, tags_path
+        print(f"[WARN] interrogator model {self.name} config not found")
+        return self.download()
+
     def load(self) -> None:
-        model_path, tags_path = self.download()
+        model_path, tags_path = self.load_model_config()
 
         # only one of these packages should be installed at a time in any one environment
         # https://onnxruntime.ai/docs/get-started/with-python.html#install-onnx-runtime
