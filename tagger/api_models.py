@@ -58,7 +58,7 @@ class InterrogateBatchFilesResponse(BaseModel):
         description='Message of the response'
     )
 
-class ImageItem:
+class ImageItem(BaseModel):
     data: str
     name: str
 
