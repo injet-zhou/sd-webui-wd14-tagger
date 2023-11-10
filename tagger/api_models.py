@@ -62,7 +62,7 @@ class ImageItem(BaseModel):
     data: str
     name: str
 
-class InterrogateResult:
+class InterrogateResult(BaseModel):
     caption: Dict[str, float]
     name: str
 
