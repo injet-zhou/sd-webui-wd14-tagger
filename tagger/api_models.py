@@ -57,3 +57,42 @@ class InterrogateBatchFilesResponse(BaseModel):
         title='Message',
         description='Message of the response'
     )
+
+class ImageItem:
+    data: str
+    name: str
+
+class InterrogateResult:
+    caption: Dict[str, float]
+    name: str
+
+class BatchInterrogateRequest(BaseModel):
+    images: List[ImageItem] = Field(
+        title='Images',
+        description='The images to be interrogated.'
+    )
+    model: str = Field(
+        title='Model',
+        description='The interrogate model used.'
+    )
+    threshold: float = Field(
+        default=0.35,
+        title='Threshold',
+        description='',
+        ge=0,
+        le=1
+    )
+
+class BatchInterrogateResponse(BaseModel):
+    code: int = Field(
+        title='Code',
+        description='The code of the response.'
+    )
+    message: str = Field(
+        title='Message',
+        description='The message of the response.'
+    )
+    captions: List[InterrogateResult] = Field(
+        title='Captions',
+        description='The results of the interrogation.'
+    )

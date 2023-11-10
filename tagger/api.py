@@ -14,6 +14,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from tagger import utils
 from tagger import api_models as models
+import traceback
 
 
 class Api:
@@ -47,6 +48,12 @@ class Api:
             self.endpoint_batch_files_interrogate,
             methods=['POST'],
             response_model=models.InterrogateBatchFilesResponse
+        )
+        self.add_api_route(
+            'batch_interrogate',
+            self.endpoint_batch_interrogate,
+            methods=['POST'],
+            response_model=models.BatchInterrogateResponse
         )
 
     def auth(self, creds: HTTPBasicCredentials = Depends(HTTPBasic())):
@@ -150,6 +157,59 @@ class Api:
         return models.InterrogatorsResponse(
             models=list(utils.interrogators.keys())
         )
+    
+    def endpoint_batch_interrogate(self, req: models.BatchInterrogateRequest):
+        try:
+            images = req.images
+            model = req.model
+            threshold = req.threshold
+            if model not in utils.interrogators.keys():
+                return models.BatchInterrogateResponse(
+                    code=404,
+                    message='Model not found',
+                    captions=[]
+                )
+            result = []
+            with self.queue_lock:
+                interrogator = utils.interrogators[model]
+                pbar = tqdm.tqdm(images)
+                for idx, image in enumerate(pbar):
+                    if image.data is None or image.data == "":
+                        return models.BatchInterrogateResponse(
+                            code=400,
+                            message=f'image data at {idx} is required',
+                            captions=[]
+                        )
+                    if image.name is None:
+                        return models.BatchInterrogateResponse(
+                            code=400,
+                            message=f'image name at {idx} is required',
+                            captions=[]
+                        )
+                    desc = f"Interrogating {idx + 1}/{len(images)}"
+                    pbar.set_description(desc)
+                    img = decode_base64_to_image(image.data)
+                    ratings, tags = interrogator.interrogate(img)
+                    tags = interrogator.postprocess_tags(tags, threshold)
+                    result.append(models.InterrogateResult(
+                        caption={
+                            **tags
+                        },
+                        name=image.name
+                    ))
+            return models.BatchInterrogateResponse(
+                code=200,
+                message='success',
+                captions=result
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return models.BatchInterrogateResponse(
+                code=500,
+                message=str(e),
+                captions=[]
+            )
+        
 
 
 def on_app_started(_, app: FastAPI):
